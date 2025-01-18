@@ -1,0 +1,22 @@
+{
+  "name": "pocket",
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Steven Day",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "command-line-args": "^6.0.1",
+    "command-line-usage": "^7.0.3",
+    "corestore": "^6.18.4",
+    "hypercore": "^10.38.1",
+    "hyperswarm": "^4.8.4",
+    "nostr-tools": "^2.10.4",
+    "tingodb": "^0.6.1",
+    "ws": "^8.18.0"
+  }
+}
