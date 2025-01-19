@@ -168,13 +168,13 @@ function printCLIDescription (exitcode, message) {
 // var myRelay = new EmbeddedRelay.Relay();
 // Testing Swarm Key a931d76b9f86c9a5c6be7c9e485eb0c90d42bc545c87d63e5cdda1452f64f957
 
-const verbose = process.env.pocketVerbose;
-
+_isStandAlone() ? console.log("Pocket Relay v0.1") : void(0);
+_isStandAlone() && _isVerbose() ? console.log("Initializing Relay engine") : void(0);
+_isStandAlone() && _isVerbose() ? console.log("Database directory:", process.env.pocketDBPath) : void(0);
 
 var myRelay = new EmbeddedRelay(process.env.pocketPersistentDB == true, {localDb : process.env.pocketDBPath});
 var netRelay = new WSRelay(myRelay, {Host: process.env.pocketHostname, Port:Number(process.env.pocketPort)});
 
-_isStandAlone() ? console.log("Pocket Relay v0.1") : void(0);
 
 _isStandAlone() ? console.log("Starting relay server...") : void(0);
 
@@ -184,6 +184,8 @@ netRelay.startServer((err) => {
         
         if (process.env.pocketP2P == 'true'){
             _isStandAlone() ? console.log("Initializing P2P network...") : void(0);
+            _isStandAlone() ? console.log("Using topic", process.env.pocketP2PKey) : void(0);
+            _isStandAlone() && _isVerbose() ? console.log("Cache directory:", process.env.pocketP2PCache) : void(0);
 
             var hyperSwarm = new HyperswarmFrontEnd(myRelay, process.env.pocketP2PKey, process.env.pocketP2PCache ? {BaseHyperCoreDirectory : process.env.pocketP2PCache} : undefined);
 

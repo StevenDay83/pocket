@@ -103,7 +103,7 @@ class HyperswarmFrontEnd {
                             this.CoreRelay.insertEvent(JSON.parse(data), "core", (err) => {
                                 if (err){
                                     // console.log("Inserted event into embedded relay");
-                                    console.log("Invalid data, ignoring");
+                                    _isStandAlone() && _isVerbose() ? console.log("Invalid data, ignoring") : void(0);
                                 }
                                 count++;
                         
@@ -143,7 +143,8 @@ class HyperswarmFrontEnd {
                             try {
                                 this.CoreRelay.insertEvent(JSON.parse(data), 'core', (err) => {
                                     if (err){
-                                        console.log("Invalid data, ignoring");
+                                        _isStandAlone() && _isVerbose() ? console.log("Invalid data, ignoring") :
+                                        void(0);
                                     } else {
                                         hypercoreBlockCount++;
 
@@ -155,7 +156,7 @@ class HyperswarmFrontEnd {
                                     }
                                 });
                             } catch (JSONParseError){
-                                console.log("Parse error, ignoring");
+                                _isStandAlone() && _isVerbose() ? console.log("Parse error, ignoring") : void(0);
                             }
                         });
                     }
@@ -185,7 +186,7 @@ class HyperswarmFrontEnd {
                         if (!err){
                             // console.log("Added Event to Relay:", data.toString());
                         } else {
-                            console.log("Error?", err);
+                            // console.log("Error?", err);
                             // console.log(data.toString());
                         }
                     });
