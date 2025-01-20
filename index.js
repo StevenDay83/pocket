@@ -6,6 +6,7 @@ const crypto = require('hypercore-crypto');
 const b4a = require('b4a');
 const commandLineArguments = require('command-line-args');
 const commandLineUsage = require('command-line-usage');
+const { _isStandAlone, _isVerbose } = require('./environment.js');
 
 const databasePrefix = './database';
 const definitions = [
@@ -17,7 +18,7 @@ const definitions = [
     {name:'p2p', type:Boolean},
     {name:'p2pkey', type:String, defaultValue:b4a.toString(crypto.randomBytes(32), 'hex')},
     {name:'p2pcache', type:String, defaultValue: databasePrefix + '/' + 'hcbase'},
-    {name:'verbose', alias:'v', type:Boolean}
+    {name:'verbose', alias:'v', type:Boolean, lazyMultiple:true}
 
 ];
 
@@ -84,19 +85,20 @@ const sections = [
                 name: 'verbose',
                 alias: 'v',
                 type: Boolean,
-                description: 'Verbose output'
+                lazyMultiple: true,
+                description: 'Verbose output. Multiple v for addtional verbosity levels.'
             }
         ]
     }
 ];
 
-function _isStandAlone() {
-    return process.env.standalone == 'true';
-}
+// function _isStandAlone() {
+//     return process.env.standalone == 'true';
+// }
 
-function _isVerbose(){
-    return process.env.pocketVerbose == 'true';
-}
+// function _isVerbose(){
+//     return process.env.pocketVerbose == 'true';
+// }
 
 try {
     var CLISettings = commandLineArguments(definitions);
@@ -109,7 +111,7 @@ try {
 
     process.env.pocketPersistentDB = CLISettings.persistentdb ? true : false;
     process.env.pocketP2P = CLISettings.p2p ? true : false;
-    process.env.pocketVerbose = CLISettings.verbose;
+    process.env.pocketVerbose = CLISettings.verbose ? CLISettings.verbose.length - 1 : -1;
 
     if (CLISettings.hostname){
         process.env.pocketHostname = CLISettings.hostname;
@@ -169,8 +171,8 @@ function printCLIDescription (exitcode, message) {
 // Testing Swarm Key a931d76b9f86c9a5c6be7c9e485eb0c90d42bc545c87d63e5cdda1452f64f957
 
 _isStandAlone() ? console.log("Pocket Relay v0.1") : void(0);
-_isStandAlone() && _isVerbose() ? console.log("Initializing Relay engine") : void(0);
-_isStandAlone() && _isVerbose() ? console.log("Database directory:", process.env.pocketDBPath) : void(0);
+_isVerbose() ? console.log("Initializing Relay engine") : void(0);
+_isVerbose() ? console.log("Database directory:", process.env.pocketDBPath) : void(0);
 
 var myRelay = new EmbeddedRelay(process.env.pocketPersistentDB == true, {localDb : process.env.pocketDBPath});
 var netRelay = new WSRelay(myRelay, {Host: process.env.pocketHostname, Port:Number(process.env.pocketPort)});
@@ -185,7 +187,7 @@ netRelay.startServer((err) => {
         if (process.env.pocketP2P == 'true'){
             _isStandAlone() ? console.log("Initializing P2P network...") : void(0);
             _isStandAlone() ? console.log("Using topic", process.env.pocketP2PKey) : void(0);
-            _isStandAlone() && _isVerbose() ? console.log("Cache directory:", process.env.pocketP2PCache) : void(0);
+            _isVerbose() ? console.log("Cache directory:", process.env.pocketP2PCache) : void(0);
 
             var hyperSwarm = new HyperswarmFrontEnd(myRelay, process.env.pocketP2PKey, process.env.pocketP2PCache ? {BaseHyperCoreDirectory : process.env.pocketP2PCache} : undefined);
 
@@ -201,7 +203,7 @@ netRelay.startServer((err) => {
                             _isStandAlone() ? console.log("Local P2P cache loaded!") : void(0);
 
                             // Verbose: Cache listening for new events
-                            _isStandAlone() && _isVerbose() ? console.log("Listening for new events from peers...") : void(0);
+                            _isVerbose() ? console.log("Listening for new events from peers...") : void(0);
                             hyperSwarm.listenForEvents();
 
                             _isStandAlone() ? console.log("Connecting to P2P discovery network...") : void(0);
@@ -232,7 +234,7 @@ netRelay.startServer((err) => {
                     });
                 } else {
                     _isStandAlone() ? console.log("P2P Cache error: ", err.message) : void(0);
-                    _isStandAlone() && _isVerbose() ? console.error(JSON.stringify(err.stack)) : void(0);
+                    _isVerbose() ? console.error(JSON.stringify(err.stack)) : void(0);
                     _isStandAlone() ? console.log("Exiting...") : void(0);
                     // Verbose full errors
                     process.exit(1);
@@ -243,7 +245,7 @@ netRelay.startServer((err) => {
 
     } else {
         _isStandAlone() ? console.log("Error starting relay:", err.message) : void(0);
-        _isStandAlone() && _isVerbose() ? console.error(err) : void(0);
+        _isVerbose() ? console.error(err) : void(0);
         _isStandAlone() ? console.log("Exiting...") : void(0);
 
         process.exit(1);

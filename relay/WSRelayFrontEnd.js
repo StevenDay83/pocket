@@ -1,14 +1,7 @@
 const EmbeddedRelay = require("./relay.js");
 const ws = require('ws');
 const NostrTools = require("nostr-tools");
-
-function _isStandAlone() {
-    return process.env.standalone == 'true';
-}
-
-function _isVerbose(){
-    return process.env.pocketVerbose == 'true';
-}
+const { _isStandAlone, _isVerbose } = require('../environment.js');
 
 class WebSocketRelayFrontEnd {
     constructor (EmRelay, Settings = {Host: '127.0.0.1', Port: 8080}){
@@ -29,8 +22,7 @@ class WebSocketRelayFrontEnd {
                 if (!err){
                     this.WSServer.on('connection', (socket, req) => {
                         let remoteAddress = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-                        _isStandAlone() ? console.log("New connection from ", remoteAddress) : void(0);
-                        _isStandAlone() ? console.log("Remote Port: ", req.socket.remotePort) : void(0);
+                        _isStandAlone() ? console.log("New connection from ", remoteAddress + ":" + req.socket.remotePort) : void(0);
                         this.socketTable[[remoteAddress, req.socket.remotePort]] = socket;
 
                         socket.on('message', (newMessage) => {
@@ -107,7 +99,7 @@ class WebSocketRelayFrontEnd {
                                         }
 
                                         socket.send(JSON.stringify(eventResponse));
-                                        _isStandAlone() && _isVerbose() ? console.log(JSON.stringify(eventResponse)) : void(0);
+                                        _isVerbose(1) ? console.log(JSON.stringify(eventResponse)) : void(0);
                                     });
                                 } else {
                                     throw new Error("Invalid Event");
@@ -182,7 +174,7 @@ class WebSocketRelayFrontEnd {
                 } else {
                     // Invalid command
                     socket.send(JSON.stringify(["CLOSED", undefined, "Error: Invalid Query"]));
-                    _isStandAlone() && _isVerbose() ? console.log(e) : void(0);
+                    _isVerbose() ? console.log(e) : void(0);
                 }
             }
         }

@@ -4,16 +4,10 @@ const Hypercore = require('hypercore');
 const crypto = require('hypercore-crypto');
 const HyperCoreConnect = require('./HypercoreConnect.js');
 const fs = require('fs');
+const { _isStandAlone, _isVerbose } = require('../environment.js');
+
 
 const KEY_RESPONSE_PREFIX = "CORE_KEY_UPDATE";
-
-function _isStandAlone() {
-    return process.env.standalone == 'true';
-}
-
-function _isVerbose(){
-    return process.env.pocketVerbose == 'true';
-}
 
 class HyperswarmFrontEnd {
     constructor(EmRelay, topic, Settings = {BaseHyperCoreDirectory : './database/hcbase/'}){
@@ -103,7 +97,7 @@ class HyperswarmFrontEnd {
                             this.CoreRelay.insertEvent(JSON.parse(data), "core", (err) => {
                                 if (err){
                                     // console.log("Inserted event into embedded relay");
-                                    _isStandAlone() && _isVerbose() ? console.log("Invalid data, ignoring") : void(0);
+                                    _isVerbose(1) ? console.log("Invalid data, ignoring") : void(0);
                                 }
                                 count++;
                         
@@ -143,7 +137,7 @@ class HyperswarmFrontEnd {
                             try {
                                 this.CoreRelay.insertEvent(JSON.parse(data), 'core', (err) => {
                                     if (err){
-                                        _isStandAlone() && _isVerbose() ? console.log("Invalid data, ignoring") :
+                                        _isVerbose(1) ? console.log("Invalid data, ignoring") :
                                         void(0);
                                     } else {
                                         hypercoreBlockCount++;
@@ -156,7 +150,7 @@ class HyperswarmFrontEnd {
                                     }
                                 });
                             } catch (JSONParseError){
-                                _isStandAlone() && _isVerbose() ? console.log("Parse error, ignoring") : void(0);
+                                _isVerbose(1) ? console.log("Parse error, ignoring") : void(0);
                             }
                         });
                     }
@@ -219,13 +213,13 @@ class HyperswarmFrontEnd {
                 this._handleData(hsConn, data.toString(), (err) => {
                     if (err){
                         _isVerbose() ? console.log("Gossip Error:", err) : void(0);
-                        _isStandAlone() && _isVerbose() ? console.error(err) : void(0);
+                        _isVerbose() ? console.error(err) : void(0);
                     }
                 });
             });
 
             hsConn.on('error', (err) => {
-                _isStandAlone() && _isVerbose() ? console.log("Connection error: ", err.message) : void(0);
+                _isVerbose() ? console.log("Connection error: ", err.message) : void(0);
                 this._removeConnection(hsConn);
             });
         });
@@ -254,13 +248,13 @@ class HyperswarmFrontEnd {
         this.CoreRelay.query({limit:1}, "hypercore", "hyperswarm", (context, subID, source, newEvent) => {
             if (source != "core"){
                 // console.log("New Event into hyperswarm", JSON.stringify(newEvent));
-                _isStandAlone() && _isVerbose() ? 
+                _isVerbose() ? 
                 console.log("Appending new Event", newEvent.id, "into Hypercore", b4a.toString(this.LocalHyperCore.key, 'hex')) :
                 void(0);
     
                 this.LocalHyperCore.append(JSON.stringify(newEvent));
             } else {
-                _isStandAlone() && _isVerbose() ? console.log("Event", newEvent.id, "originates from hypercore peer") : void(0);
+                _isVerbose() ? console.log("Event", newEvent.id, "originates from hypercore peer") : void(0);
             }
         }, () => {});
     }
@@ -342,13 +336,13 @@ class HyperswarmFrontEnd {
                     if (directive == KEY_RESPONSE_PREFIX){
                         if (payload.length == 64) {
                             if (!this.hyperCoreExists(b4a.from(payload, 'hex'))){
-                                _isStandAlone() && _isVerbose() ? console.log("Hypercore ", payload, "does not exists") : void(0);
+                                _isVerbose() ? console.log("Hypercore ", payload, "does not exists") : void(0);
 
                                 var currentCoreDirectory = this.BaseHyperCoreDirectory + '/' + b4a.toString(this.SwarmTopicKey, 'hex') + '/';
     
                                 var hyperCoreKey = b4a.from(payload, 'hex');
-                                // _isStandAlone() && _isVerbose() ? console.log("Directory: ", currentCoreDirectory + '/' + payload) : void(0);
-                                _isStandAlone() && _isVerbose() ? console.log("New Hypercore key (" + payload + ") received. Adding to cache...") : void(0);
+                                // _isVerbose() ? console.log("Directory: ", currentCoreDirectory + '/' + payload) : void(0);
+                                _isVerbose() ? console.log("New Hypercore key (" + payload + ") received. Adding to cache...") : void(0);
                                 var newHyperCore = new Hypercore(currentCoreDirectory + '/' + payload, hyperCoreKey);
 
                                 newHyperCore.ready().then(() => {
@@ -358,7 +352,7 @@ class HyperswarmFrontEnd {
                                     });
                                 });
                             } else {
-                                _isStandAlone() && _isVerbose() ? console.log("Hypercore key advertisement: ", payload, "is already in cache. Ignoring...") : void(0);
+                                _isVerbose() ? console.log("Hypercore key advertisement: ", payload, "is already in cache. Ignoring...") : void(0);
                             }
                         } else {
                             callback(new Error("Invalid Payload"));

@@ -1,14 +1,7 @@
 const Hypercore = require('hypercore');
 const Hyperswarm = require('hyperswarm');
-const b4a = require('b4a')
-
-function _isStandAlone() {
-    return process.env.standalone == 'true';
-}
-
-function _isVerbose(){
-    return process.env.pocketVerbose == 'true';
-}
+const b4a = require('b4a');
+const { _isStandAlone, _isVerbose } = require('../environment.js');
 
 class HypercoreConnect {
     constructor(){
@@ -49,7 +42,7 @@ class HypercoreConnect {
                 });
 
                 localConn.on('error', (err) => {
-                    _isStandAlone() && _isVerbose() ? console.error("Error :", err) : void(0);
+                    _isVerbose() ? console.error("Error :", err) : void(0);
                     _isStandAlone() ? console.error("Local Hypercore: Connection error -", err.message) : void(0);
                 });
 
@@ -103,8 +96,8 @@ class HypercoreConnect {
                 });
 
                 conn.on('error', (err) => {
-                    _isStandAlone() && _isVerbose() ? console.error("Error :", err) : void(0);
                     _isStandAlone() ? console.error("Local Hypercore: Connection error -", err.message) : void(0);
+                    _isVerbose() ? console.error("Error :", err) : void(0);
                 });
             });
 
