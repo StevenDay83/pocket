@@ -159,7 +159,7 @@ class WebSocketRelayFrontEnd {
 
                                     this.CoreRelay.endQuery([socket._socket.remoteAddress, socket._socket.remotePort], subscriptionID);
 
-                                    socket.send(JSON.stringify(["CLOSE", subscriptionID]));
+                                    socket.send(JSON.stringify(["CLOSED", subscriptionID]));
                                 }
                             }
                         }
