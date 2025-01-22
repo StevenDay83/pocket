@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 process.env.standalone = true;
 const EmbeddedRelay = require('./relay/relay.js');
 const WSRelay = require('./relay/WSRelayFrontEnd.js');
@@ -186,10 +187,10 @@ netRelay.startServer((err) => {
         
         if (process.env.pocketP2P == 'true'){
             _isStandAlone() ? console.log("Initializing P2P network...") : void(0);
-            _isStandAlone() ? console.log("Using topic", process.env.pocketP2PKey) : void(0);
             _isVerbose() ? console.log("Cache directory:", process.env.pocketP2PCache) : void(0);
 
             var hyperSwarm = new HyperswarmFrontEnd(myRelay, process.env.pocketP2PKey, process.env.pocketP2PCache ? {BaseHyperCoreDirectory : process.env.pocketP2PCache} : undefined);
+            _isStandAlone() ? console.log("Using topic", b4a.toString(hyperSwarm.SwarmTopicKey,'hex')) : void(0);
 
             _isStandAlone() ? console.log("Setting up P2P cache...") : void(0);
             hyperSwarm.initializeCores((err, coreCount) => {
