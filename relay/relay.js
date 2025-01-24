@@ -411,7 +411,7 @@ for kind n such that 30000 <= n < 40000, events are addressable by their kind, p
                 delete this.querySubs[context];
             }
         } else {
-            if (this.querySubs[context][subID]){
+            if (this.querySubs[context] && this.querySubs[context][subID]){
                 delete this.querySubs[context][subID];
             }
         }
