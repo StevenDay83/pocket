@@ -32,18 +32,18 @@ class HypercoreConnect {
             this.LocalHyperCoreSwarm.on('connection', (localConn) => {
                 this.LocalHyperCore.replicate(localConn);
                 _isStandAlone() ? 
-                console.log("Local HyperCore: Received connection from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")") :
+                console.log("Local HyperCore (" + b4a.toString(this.LocalHyperCore.key,'hex') +"): Received connection from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")") :
                 void(0);
 
                 localConn.once('close', () => {
-                    _isStandAlone() ? console.log("Local Hypercore: Connection closed from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")")
+                    _isStandAlone() ? console.log("Local Hypercore ("+ b4a.toString(this.LocalHyperCore.key,'hex') + "): Connection closed from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")")
                     : void(0);
                     
                 });
 
                 localConn.on('error', (err) => {
                     _isVerbose() ? console.error("Error :", err) : void(0);
-                    _isStandAlone() ? console.error("Local Hypercore: Connection error -", err.message) : void(0);
+                    _isStandAlone() ? console.error("Local Hypercore (" + b4a.toString(this.LocalHyperCore.key,'hex') + "): Connection error -", err.message) : void(0);
                 });
 
             });
@@ -85,18 +85,18 @@ class HypercoreConnect {
             thisSwarm.on('connection', async (conn) => {
                 thisCore.replicate(conn);
                 await thisCore.update();
-                await thisCore.download();
+                await thisCore.download({linear: true});
 
-                _isStandAlone() ? console.log("Remote Hypercore: Received connection from peer (" + b4a.toString(conn.remotePublicKey, 'hex') + ")") :
+                _isStandAlone() ? console.log("Remote Hypercore ("+ b4a.toString(thisCore.key,'hex') +"): Received connection from peer (" + b4a.toString(conn.remotePublicKey, 'hex') + ")") :
                 void(0);
 
                 conn.once('close', () => {
-                    _isStandAlone() ? console.log("Remote Hypercore: Connection closed from peer (" + b4a.toString(conn.remotePublicKey, 'hex') + ")") :
+                    _isStandAlone() ? console.log("Remote Hypercore (" + b4a.toString(thisCore.key,'hex') + "): Connection closed from peer (" + b4a.toString(conn.remotePublicKey, 'hex') + ")") :
                     void(0);
                 });
 
                 conn.on('error', (err) => {
-                    _isStandAlone() ? console.error("Local Hypercore: Connection error -", err.message) : void(0);
+                    _isStandAlone() ? console.error("Remote Hypercore" + b4a.toString(thisCore.key,'hex') + ": Connection error -", err.message) : void(0);
                     _isVerbose() ? console.error("Error :", err) : void(0);
                 });
             });
@@ -213,6 +213,47 @@ class HypercoreConnect {
         for (var i = 0; i < listenerList.length; i++){
             listenerList[i](coreKey, data);
         }
+    }
+
+    _getCoreByDiscoveryKey(swarmKey){
+        var foundCore;
+        // Must Fix: DO NOT USE
+        if (swarmKey){
+            var localDiscoveryKey = b4a.toString(this.LocalHyperCore.discoveryKey, 'hex');
+
+            if (swarmKey == localDiscoveryKey){
+                foundCore = this.LocalHyperCore;
+            } else {
+                var readableCoreKeys = Object.keys(this.ReadableHyperCoreSwarms);
+                for (var i = 0; i < readableCoreKeys.length; i++){
+                    var thisReadableCoreKey = readableCoreKeys[i];
+
+                    var thisCore = this.ReadableHyperCoreSwarms[readableCoreKeys[i]];
+                    var thisCoreDiscoveryKey = thisCore.discoveryKey;
+
+                    if (swarmKey == b4a.toString(thisCoreDiscoveryKey, 'hex')){
+                        foundCore = thisCore;
+                        break; 
+                    }
+                }
+            }
+        }
+
+        return foundCore;
+    }
+
+    _getCoreKeyByDiscoveryKey(discoveryKey){
+        var coreKey;
+
+        if (discoveryKey){
+            var foundCore = this._getCoreByDiscoveryKey(discoveryKey);
+
+            if (foundCore){
+                coreKey = b4a.toString(discoveryKey, 'hex');
+            }
+        }
+
+        return coreKey;
     }
 }
 

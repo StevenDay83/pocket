@@ -352,7 +352,7 @@ class HyperswarmFrontEnd {
                                     });
                                 });
                             } else {
-                                _isVerbose() ? console.log("Hypercore key advertisement: ", payload, "is already in cache. Ignoring...") : void(0);
+                                _isVerbose(2) ? console.log("Hypercore key advertisement: ", payload, "is already in cache. Ignoring...") : void(0);
                             }
                         } else {
                             callback(new Error("Invalid Payload"));
