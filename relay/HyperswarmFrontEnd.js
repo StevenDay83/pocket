@@ -80,7 +80,7 @@ class HyperswarmFrontEnd {
     }
 
     importEventsFromLocalHyperCore(callback){
-        this.importEventsFromHyperCore(this.LocalHyperCore, (err) => {
+        this.importEventsFromHyperCore(this.LocalHyperCore, 0, (err) => {
             callback(err);
         });
     }
@@ -103,7 +103,7 @@ class HyperswarmFrontEnd {
                 //     }
                 // });
 
-                await this.importEventsFromHyperCore(thisReadableHyperCore);
+                await this.importEventsFromHyperCore(thisReadableHyperCore, 500);
 
                 // p_importEventsFromHyperCore(thisReadableHyperCore).then((err) => {
                 //     console.log("Reading from Remote Hypercore", readableHyperCoreCount);
@@ -137,7 +137,7 @@ class HyperswarmFrontEnd {
         callback(undefined);
     }
 
-    async importEventsFromHyperCore(hc, callback){
+    async importEventsFromHyperCore(hc, blocklimit = 0, callback){
         // Run through every Hypercore for log entries
         // Feed them into the Relay
         // Invalid event objects should be ignored
@@ -152,7 +152,7 @@ class HyperswarmFrontEnd {
                 } else {
                     var blockStart = 0;
 
-                    if (hc.length > 500) {
+                    if (blocklimit > 0 && hc.length > blocklimit) {
                         blockStart = hc.length - 500;
                         hc.clear(blockStart + 1);
                     }
