@@ -133,173 +133,212 @@ class Relay {
 
     insertEvent(newEvent, source, callback){
         // Insert one at a time
-        var eventCollection = this.EmbeddedDB.collection(this.defaultCollection);
+        return new Promise((resolve,reject) => {
+            var eventCollection = this.EmbeddedDB.collection(this.defaultCollection);
 
-        if (newEvent != undefined && this._verifyEvent(newEvent)){
-            // Event is valid
-            // Check for which Kind
+            if (newEvent != undefined /* && this._verifyEvent(newEvent)*/) {
+                // Event is valid
+                // Check for which Kind
 
-            var thisKind = newEvent.kind;
+                var thisKind = newEvent.kind;
 
-            var regularEvent = (thisKind == 1 || thisKind == 2 || (thisKind >= 4 && thisKind < 45) || (thisKind >= 1000 && thisKind < 10000));
-            var replaceableEvent = (thisKind == 0 || thisKind == 3 || (thisKind >= 10000 && thisKind < 20000));
-            var ephemeralEvent = (thisKind >= 20000 && thisKind < 30000);
-            var addressableReplaceable = thisKind >= 30000 && thisKind < 40000;
-            var undefinedNIP01Event = thisKind >= 40000 && thisKind <= 65535; // For now treat like regular events
+                var regularEvent = (thisKind == 1 || thisKind == 2 || (thisKind >= 4 && thisKind < 45) || (thisKind >= 1000 && thisKind < 10000));
+                var replaceableEvent = (thisKind == 0 || thisKind == 3 || (thisKind >= 10000 && thisKind < 20000));
+                var ephemeralEvent = (thisKind >= 20000 && thisKind < 30000);
+                var addressableReplaceable = thisKind >= 30000 && thisKind < 40000;
+                var undefinedNIP01Event = thisKind >= 40000 && thisKind <= 65535; // For now treat like regular events
 
-            if (regularEvent || undefinedNIP01Event){
-                var eventId = newEvent.id;
+                if (regularEvent || undefinedNIP01Event) {
+                    var eventId = newEvent.id;
 
-                eventCollection.findOne({id:eventId}, {_id:0}, (err, result) => {
-                    // If event exists just act like we wrote it
-                    if (result){
-                        var cleanEvent = this._cleanEvent(newEvent);
-                        // this._sendToListeners(cleanEvent);
-                        callback(undefined, cleanEvent);
-                    } else {
-                        // Write event
-
-                        eventCollection.insert(newEvent, (err) => {
-                            if (!err){
-                                var cleanEvent = this._cleanEvent(newEvent);
-                                this._sendToListeners(cleanEvent, source);
-                                callback(undefined, cleanEvent);
-                            } else {
-                                console.error(err);
-                                callback(new Error(INSERT_DATABASE_ERROR));
-                            }
-                        });
-                    }
-                });
-
-            } else if (replaceableEvent){
-                var thisPubkey = newEvent.pubkey;
-
-                eventCollection.findOne({pubkey:thisPubkey, kind:thisKind}, {_id:0}, (err, result) => {
-                    // If something is found, compare time stamps. newer one gets written
-
-                    if (result){
-                        if (result.created_at >= newEvent.created_at){
-                            callback(undefined, result);
+                    eventCollection.findOne({ id: eventId }, { _id: 0 }, (err, result) => {
+                        // If event exists just act like we wrote it
+                        if (result) {
+                            var cleanEvent = this._cleanEvent(newEvent);
+                            // this._sendToListeners(cleanEvent);
+                            callback ? callback(undefined, cleanEvent) : void(0);
+                            return resolve(cleanEvent);
                         } else {
-                            eventCollection.remove({id:result.id}, (err, result) => {
-                                if (!err){
-                                    // console.log("Removal result: ", result);
-                                    eventCollection.insert(newEvent, (err) => {
-                                        if (!err){
-                                            // Broadcast new Event to any listeners
-                                            var cleanEvent = this._cleanEvent(newEvent);
-                                            this._sendToListeners(cleanEvent, source);
-                                            callback(undefined, cleanEvent);
+                            // Write event
 
-                                        } else {
-                                            console.error(err);
-                                            callback(new Error(INSERT_DATABASE_ERROR));
-                                        }
-                                    })
+                            eventCollection.insert(newEvent, (err) => {
+                                if (!err) {
+                                    var cleanEvent = this._cleanEvent(newEvent);
+                                    this._sendToListeners(cleanEvent, source);
+                                    callback ? callback(undefined, cleanEvent) : void(0);
+                                    return resolve(cleanEvent);
                                 } else {
                                     console.error(err);
-                                    callback(new Error(INSERT_DATABASE_ERROR));
+                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                    return reject(new Error(INSERT_DATABASE_ERROR));
                                 }
                             });
                         }
-                    } else {
-                        eventCollection.insert(newEvent, (err, result) => {
-                            if (!err) {
-                                // Broadcast new Event to any listeners
-                                var cleanEvent = this._cleanEvent(newEvent);
-                                this._sendToListeners(cleanEvent, source);
-                                callback(undefined, cleanEvent);
+                    });
+
+                } else if (replaceableEvent) {
+                    var thisPubkey = newEvent.pubkey;
+
+                    eventCollection.findOne({ pubkey: thisPubkey, kind: thisKind }, { _id: 0 }, (err, result) => {
+                        // If something is found, compare time stamps. newer one gets written
+
+                        if (result) {
+                            if (result.created_at >= newEvent.created_at) {
+                                callback ? callback(undefined, result) : void(0);
+                                return resolve(result);
                             } else {
-                                console.error(err);
-                                callback(new Error(INSERT_DATABASE_ERROR));
-                            }
-                        });
-                    }
-                });
-            } else if (ephemeralEvent){
-                // Don't store anything, just sent it off
-                this._sendToListeners(newEvent, source);
-                callback(undefined, newEvent);
-            } else if (addressableReplaceable){
-                var thisPubkey = newEvent.pubkey;
-                var dTag = this._getTag(newEvent.tags, "d");
-
-                if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1){
-                    // callback(new Error("Invalid DTag"));
-                    callback(new Error(INSERT_EVENT_ERROR));
-                    return;
-                }
-
-                this._findResultsOR(eventCollection,{pubkey:thisPubkey,kind:thisKind}, {}, (err, results) => {
-                    if (!err){
-                        if (results != undefined && results.length > 0){
-                                // We are going to find some results with the pubkey and kind.
-                                // Weed out the ones without the d tag
-
-                                for (var i = 0; i < results.length; i++){
-                                var thisEvent = results[i];
-                                var thisEventDTag = this._getTag(thisEvent.tags, "d");
-
-                                if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])){
-                                    // Found!
-                                    if (thisEvent.created_at <= newEvent.created_at){
-                                        eventCollection.remove({id:thisEvent.id}, (err) => {
+                                eventCollection.remove({ id: result.id }, (err, result) => {
+                                    if (!err) {
+                                        // console.log("Removal result: ", result);
+                                        eventCollection.insert(newEvent, (err) => {
                                             if (!err) {
-                                                eventCollection.insert(newEvent, (err) => {
-                                                    if (!err){
-                                                        // Broadcast new Event to any listeners
-                                                        var cleanEvent = this._cleanEvent(newEvent);
-                                                        this._sendToListeners(cleanEvent, source);
-                                                        callback(undefined, cleanEvent);
-                                                    } else {
-                                                        console.error(err);
-                                                        callback(new Error(INSERT_DATABASE_ERROR));
-                                                    }
-                                                });
+                                                // Broadcast new Event to any listeners
+                                                var cleanEvent = this._cleanEvent(newEvent);
+                                                this._sendToListeners(cleanEvent, source);
+                                                callback ? callback(undefined, cleanEvent) : void(0);
+                                                return resolve(cleanEvent);
                                             } else {
                                                 console.error(err);
-                                                callback(new Error(INSERT_DATABASE_ERROR));
+                                                callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                                return reject(new Error(INSERT_DATABASE_ERROR));
                                             }
-                                        });
-                                        break;
+                                        })
                                     } else {
-                                        callback(undefined, thisEvent);
+                                        console.error(err);
+                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                        return reject(new Error(INSERT_DATABASE_ERROR));
                                     }
-                                }
+                                });
                             }
                         } else {
-                            eventCollection.insert(newEvent, (err) => {
-                                if (!err){
+                            eventCollection.insert(newEvent, (err, result) => {
+                                if (!err) {
                                     // Broadcast new Event to any listeners
                                     var cleanEvent = this._cleanEvent(newEvent);
                                     this._sendToListeners(cleanEvent, source);
-                                    callback(undefined, cleanEvent);
+                                    callback ? callback(undefined, cleanEvent) : void(0);
+                                    return resolve(cleanEvent);
                                 } else {
                                     console.error(err);
-                                    callback(new Error(INSERT_DATABASE_ERROR));
+                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                    return reject(new Error(INSERT_DATABASE_ERROR));
                                 }
                             });
                         }
-                    } else {
-                        console.error(err);
-                        callback(new Error(INSERT_DATABASE_ERROR));
+                    });
+                } else if (ephemeralEvent) {
+                    // Don't store anything, just sent it off
+                    this._sendToListeners(newEvent, source);
+                    callback ? callback(undefined, newEvent) : void(0);
+                    return resolve(newEvent);
+                } else if (addressableReplaceable) {
+                    var thisPubkey = newEvent.pubkey;
+                    var dTag = this._getTag(newEvent.tags, "d");
+
+                    if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
+                        // callback(new Error("Invalid DTag"));
+                        callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
+                        return reject(new Error(INSERT_EVENT_ERROR));
                     }
-                });
+
+                    this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
+                        if (!err) {
+                            if (results != undefined && results.length > 0) {
+                                // We are going to find some results with the pubkey and kind.
+                                // Weed out the ones without the d tag
+                                var FoundEvent = false;
+
+                                for (var i = 0; i < results.length; i++) {
+                                    var thisEvent = results[i];
+                                    var thisEventDTag = this._getTag(thisEvent.tags, "d");
+
+                                    if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])) {
+                                        // Found!
+                                        FoundEvent = true;
+                                        if (thisEvent.created_at <= newEvent.created_at) {
+                                            eventCollection.remove({ id: thisEvent.id }, (err) => {
+                                                if (!err) {
+                                                    eventCollection.insert(newEvent, (err) => {
+                                                        if (!err) {
+                                                            // Broadcast new Event to any listeners
+                                                            var cleanEvent = this._cleanEvent(newEvent);
+                                                            this._sendToListeners(cleanEvent, source);
+                                                            callback ? callback(undefined, cleanEvent) : void(0);
+                                                            return resolve(cleanEvent);
+                                                        } else {
+                                                            console.error(err);
+                                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                                            return reject(new Error(INSERT_DATABASE_ERROR));
+                                                        }
+                                                    });
+                                                } else {
+                                                    console.error(err);
+                                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                                    return reject(new Error(INSERT_DATABASE_ERROR));
+                                                }
+                                            });
+                                            break;
+                                        } else {
+                                            callback ? callback(undefined, thisEvent) : void(0);
+                                            return resolve(thisEvent);
+                                        }
+                                    }
+                                }
+                                if (!FoundEvent){
+                                    eventCollection.insert(newEvent, (err) => {
+                                        if (!err) {
+                                            // Broadcast new Event to any listeners
+                                            var cleanEvent = this._cleanEvent(newEvent);
+                                            this._sendToListeners(cleanEvent, source);
+                                            callback ? callback(undefined, cleanEvent) : void(0);
+                                            return resolve(cleanEvent);
+                                        } else {
+                                            console.error(err);
+                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                            return reject(new Error(INSERT_DATABASE_ERROR));
+                                        }
+                                    });
+                                }
+
+                            } else {
+                                eventCollection.insert(newEvent, (err) => {
+                                    if (!err) {
+                                        // Broadcast new Event to any listeners
+                                        var cleanEvent = this._cleanEvent(newEvent);
+                                        this._sendToListeners(cleanEvent, source);
+                                        callback ? callback(undefined, cleanEvent) : void(0);
+                                        return resolve(cleanEvent);
+                                    } else {
+                                        console.error(err);
+                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                        return reject(new Error(INSERT_DATABASE_ERROR));
+                                    }
+                                });
+                            }
+                        } else {
+                            console.error(err);
+                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                            return reject(new Error(INSERT_DATABASE_ERROR));
+                        }
+                    });
+                } else {
+                    callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
+                    return reject(new Error(INSERT_EVENT_ERROR));
+                }
+
+                /*
+                for kind n such that 1000 <= n < 10000 || 4 <= n < 45 || n == 1 || n == 2, events are regular, which means they're all expected to be stored by relays.
+    for kind n such that 10000 <= n < 20000 || n == 0 || n == 3, events are replaceable, which means that, for each combination of pubkey and kind, only the latest event MUST be stored by relays, older versions MAY be discarded.
+    for kind n such that 20000 <= n < 30000, events are ephemeral, which means they are not expected to be stored by relays.
+    for kind n such that 30000 <= n < 40000, events are addressable by their kind, pubkey and d tag value -- which means that, for each combination of kind, pubkey and the d tag value, only the latest event MUST be stored by relays, older versions MAY be discarded.
+                */
+
             } else {
-                callback(new Error(INSERT_EVENT_ERROR));
+                callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
+                return reject(new Error(INSERT_EVENT_ERROR));
             }
-
-            /*
-            for kind n such that 1000 <= n < 10000 || 4 <= n < 45 || n == 1 || n == 2, events are regular, which means they're all expected to be stored by relays.
-for kind n such that 10000 <= n < 20000 || n == 0 || n == 3, events are replaceable, which means that, for each combination of pubkey and kind, only the latest event MUST be stored by relays, older versions MAY be discarded.
-for kind n such that 20000 <= n < 30000, events are ephemeral, which means they are not expected to be stored by relays.
-for kind n such that 30000 <= n < 40000, events are addressable by their kind, pubkey and d tag value -- which means that, for each combination of kind, pubkey and the d tag value, only the latest event MUST be stored by relays, older versions MAY be discarded.
-            */
-
-        } else {
-            callback(new Error(INSERT_EVENT_ERROR));
-        }
+        }); // Promise
+        
     }
 
     _sendToListeners(newEvent, source){

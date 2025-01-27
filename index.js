@@ -203,30 +203,60 @@ netRelay.startServer((err) => {
                         if (!err) {
                             _isStandAlone() ? console.log("Local P2P cache loaded!") : void(0);
 
+                            // hyperSwarm.listenForEvents();
+                            hyperSwarm.importEventsFromReadableHypercores((err) => {
+                                if (!err) {
+                                    _isStandAlone() ? console.log("Remote P2P cache loaded!") : void(0);
+                                    _isVerbose() ? console.log("Listening for new events from peers...") : void(0);
+                                    hyperSwarm.listenForEvents();
+
+
+                                    _isStandAlone() ? console.log("Connecting to P2P discovery network...") : void(0);
+                                    hyperSwarm.connectToGossipSwarm((err, discoveryKey) => {
+                                        if (!err){
+                                            _isStandAlone() ? console.log("Successfully connected to ", discoveryKey) : void(0);
+        
+                                        } else {
+                                            _isStandAlone() ? console.log("Error connecting to P2P discovery network: ", err.message) : void(0);
+                                            //Verbose full error
+                                        }
+                                    });
+                                    // Verbose: Connecting to Hypercores
+        
+                                    _isStandAlone() ? console.log("Intializing data sync with peers...") : void(0);
+                                    hyperSwarm.connectHyperCoreSwarms((err) => {
+                                        if (!err){
+                                            _isStandAlone() ? console.log("Data sync peering in progress...") : void(0);
+                                        } else {
+                                            _isStandAlone() ? console.log("Error initializing peering: ", err.message) : void(0);
+                                        }
+                                    });
+                                }
+                            });
+
+
                             // Verbose: Cache listening for new events
-                            _isVerbose() ? console.log("Listening for new events from peers...") : void(0);
-                            hyperSwarm.listenForEvents();
 
-                            _isStandAlone() ? console.log("Connecting to P2P discovery network...") : void(0);
-                            hyperSwarm.connectToGossipSwarm((err, discoveryKey) => {
-                                if (!err){
-                                    _isStandAlone() ? console.log("Successfully connected to ", discoveryKey) : void(0);
+                            // _isStandAlone() ? console.log("Connecting to P2P discovery network...") : void(0);
+                            // hyperSwarm.connectToGossipSwarm((err, discoveryKey) => {
+                            //     if (!err){
+                            //         _isStandAlone() ? console.log("Successfully connected to ", discoveryKey) : void(0);
 
-                                } else {
-                                    _isStandAlone() ? console.log("Error connecting to P2P discovery network: ", err.message) : void(0);
-                                    //Verbose full error
-                                }
-                            });
-                            // Verbose: Connecting to Hypercores
+                            //     } else {
+                            //         _isStandAlone() ? console.log("Error connecting to P2P discovery network: ", err.message) : void(0);
+                            //         //Verbose full error
+                            //     }
+                            // });
+                            // // Verbose: Connecting to Hypercores
 
-                            _isStandAlone() ? console.log("Intializing data sync with peers...") : void(0);
-                            hyperSwarm.connectHyperCoreSwarms((err) => {
-                                if (!err){
-                                    _isStandAlone() ? console.log("Data sync peering in progress...") : void(0);
-                                } else {
-                                    _isStandAlone() ? console.log("Error initializing peering: ", err.message) : void(0);
-                                }
-                            });
+                            // _isStandAlone() ? console.log("Intializing data sync with peers...") : void(0);
+                            // hyperSwarm.connectHyperCoreSwarms((err) => {
+                            //     if (!err){
+                            //         _isStandAlone() ? console.log("Data sync peering in progress...") : void(0);
+                            //     } else {
+                            //         _isStandAlone() ? console.log("Error initializing peering: ", err.message) : void(0);
+                            //     }
+                            // });
                         } else {
                             _isStandAlone() ? console.log("Error loading local P2P Cache: ", err.message) : void(0);
                             // Verbose full errors
