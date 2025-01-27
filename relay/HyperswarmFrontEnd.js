@@ -80,7 +80,7 @@ class HyperswarmFrontEnd {
     }
 
     importEventsFromLocalHyperCore(callback){
-        this.importEventsFromHyperCore(this.LocalHyperCore, 0, (err) => {
+        this.importEventsFromHyperCore(this.LocalHyperCore, 2000, (err) => {
             callback(err);
         });
     }
