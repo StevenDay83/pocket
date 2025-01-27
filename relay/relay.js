@@ -136,7 +136,7 @@ class Relay {
         return new Promise((resolve,reject) => {
             var eventCollection = this.EmbeddedDB.collection(this.defaultCollection);
 
-            if (newEvent != undefined /* && this._verifyEvent(newEvent)*/) {
+            if (newEvent != undefined && this._verifyEvent(newEvent)) {
                 // Event is valid
                 // Check for which Kind
 

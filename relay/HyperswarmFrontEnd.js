@@ -94,6 +94,7 @@ class HyperswarmFrontEnd {
 
             for (var i = 0; i < this.ReadableHyperCoreList.length; i++){
                 var thisReadableHyperCore = this.ReadableHyperCoreList[i];
+                _isVerbose(1) ? console.log("Importing data from hypercore", b4a.toString(thisReadableHyperCore.key, 'hex') + "...") : void(0);
 
                 // this.importEventsFromHyperCore(thisReadableHyperCore, (err) => {
                 //     console.log("Reading from Remote Hypercore", readableHyperCoreCount);
@@ -154,7 +155,7 @@ class HyperswarmFrontEnd {
 
                     if (blocklimit > 0 && hc.length > blocklimit) {
                         blockStart = hc.length - 500;
-                        hc.clear(blockStart + 1);
+                        await hc.clear(0, blockStart - 1);
                     }
                     for (var i = blockStart; i < hc.length; i++){
                         // console.log("What's i doing at", i);
@@ -165,7 +166,7 @@ class HyperswarmFrontEnd {
                             //     console.log(JSON.parse(blockData));
                             // }
                             await this.CoreRelay.insertEvent(JSON.parse(blockData), 'core');
-                            _isVerbose(5) ? console.log('In Hypercore', b4a.toString(hc.key, 'hex'), "block", i, "of", hc.length) : void(0);
+                            _isVerbose(4) ? console.log('In Hypercore', b4a.toString(hc.key, 'hex'), "block", i, "of", (hc.length - 1)) : void(0);
     
                         } catch (err){
                             _isVerbose(1) ? console.log("Invalid data, ignoring") : void(0);
