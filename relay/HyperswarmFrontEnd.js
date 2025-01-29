@@ -89,12 +89,12 @@ class HyperswarmFrontEnd {
         if (this.ReadableHyperCoreList && this.ReadableHyperCoreList.length > 0){
             var readableHyperCoreCount = 0;
             var hypercoreBlockCount = 0;
-            const promisify = require('util').promisify;
             // var p_importEventsFromHyperCore = promisify(this.importEventsFromHyperCore);
 
             for (var i = 0; i < this.ReadableHyperCoreList.length; i++){
                 var thisReadableHyperCore = this.ReadableHyperCoreList[i];
-                _isVerbose(1) ? console.log("Importing data from hypercore", b4a.toString(thisReadableHyperCore.key, 'hex') + "...") : void(0);
+                _isVerbose(1) ? console.log("Importing data from hypercore", b4a.toString(thisReadableHyperCore.key, 'hex') + 
+                "(core",i + 1,"of",this.ReadableHyperCoreList.length + ")...") : void(0);
 
                 // this.importEventsFromHyperCore(thisReadableHyperCore, (err) => {
                 //     console.log("Reading from Remote Hypercore", readableHyperCoreCount);
@@ -151,58 +151,43 @@ class HyperswarmFrontEnd {
                     callback ? callback(undefined) : void(0);
                     return resolve(true);
                 } else {
+
                     var blockStart = 0;
 
                     if (blocklimit > 0 && hc.length > blocklimit) {
-                        blockStart = hc.length - 500;
+                        blockStart = hc.length - blocklimit;
                         await hc.clear(0, blockStart - 1);
                     }
+                    const fullStream = hc.createReadStream();
+
+                    // for await (const blockData of fullStream){
+                    //     try {
+                    //         // if (i == 471){
+                    //         //     console.log(JSON.parse(blockData));
+                    //         // }
+                    //         await this.CoreRelay.insertEvent(JSON.parse(blockData), 'core');
+                    //         _isVerbose(4) ? console.log('In Hypercore', b4a.toString(hc.key, 'hex'), "block", count++, "of", (hc.length - 1)) : void(0);
+    
+                    //     } catch (err){
+                    //         _isVerbose(1) ? console.log("Invalid data, ignoring") : void(0);
+                    //     }
+                    // }
+
+
+
+                    _isVerbose(1) ? console.log("Loading", hc.length - blockStart, "events...") : void(0);
                     for (var i = blockStart; i < hc.length; i++){
                         // console.log("What's i doing at", i);
                         var blockData = await hc.get(i, {wait: false});
-    
+
                         try {
-                            // if (i == 471){
-                            //     console.log(JSON.parse(blockData));
-                            // }
                             await this.CoreRelay.insertEvent(JSON.parse(blockData), 'core');
+
                             _isVerbose(4) ? console.log('In Hypercore', b4a.toString(hc.key, 'hex'), "block", i, "of", (hc.length - 1)) : void(0);
     
                         } catch (err){
                             _isVerbose(1) ? console.log("Invalid data, ignoring") : void(0);
                         }
-    
-                        
-    
-                        // hc.get(i, {wait: true}).then((data) => {
-                        //     // console.log("HyperCore data for block", count, ":", data.toString());
-                        //     try {
-                        //         this.CoreRelay.insertEvent(JSON.parse(data), "core", (err) => {
-                        //             // console.log("Inserting event");
-                        //             if (err){
-                        //                 // console.log("Inserted event into embedded relay");
-                        //                 _isVerbose(1) ? console.log("Invalid data, ignoring") : void(0);
-                        //             }
-                        //             count++;
-                            
-                        //             console.log('In Hypercore', b4a.toString(hc.key, 'hex'), "block", count, "of", hc.length);
-                        //             if (count == hc.length){
-                        //                 // this.importEventsFromReadableHypercores((err) => {
-                        //                 //     callback(err); // Callback when all cores are read
-                        //                 // });
-                        //                 callback(err);
-                        //             }
-                        //         });
-                        //     } catch (parseError){
-                        //         console.error(parseError);
-                        //         console.log("Parse error, ignoring");
-                        //     }
-                            // count++;
-                            
-                            // if (count == this.LocalHyperCore.length){
-                            //     callback(undefined);
-                            // }
-                        // });
                     }
                     callback ? callback(undefined) : void(0);
                     return resolve(true);

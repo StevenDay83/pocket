@@ -148,183 +148,369 @@ class Relay {
                 var addressableReplaceable = thisKind >= 30000 && thisKind < 40000;
                 var undefinedNIP01Event = thisKind >= 40000 && thisKind <= 65535; // For now treat like regular events
 
-                if (regularEvent || undefinedNIP01Event) {
-                    var eventId = newEvent.id;
+                var eventClass = (regularEvent || undefinedNIP01Event) ? 'A' : replaceableEvent ? 'B' :
+                ephemeralEvent ? 'C' : addressableReplaceable ? 'D' : 'ERROR';
+                
+                var handleEvent = {
+                    'A': () => {
+                        var eventId = newEvent.id;
 
-                    eventCollection.findOne({ id: eventId }, { _id: 0 }, (err, result) => {
-                        // If event exists just act like we wrote it
-                        if (result) {
-                            var cleanEvent = this._cleanEvent(newEvent);
-                            // this._sendToListeners(cleanEvent);
-                            callback ? callback(undefined, cleanEvent) : void(0);
-                            return resolve(cleanEvent);
-                        } else {
-                            // Write event
-
-                            eventCollection.insert(newEvent, (err) => {
-                                if (!err) {
-                                    var cleanEvent = this._cleanEvent(newEvent);
-                                    this._sendToListeners(cleanEvent, source);
-                                    callback ? callback(undefined, cleanEvent) : void(0);
-                                    return resolve(cleanEvent);
-                                } else {
-                                    console.error(err);
-                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                    return reject(new Error(INSERT_DATABASE_ERROR));
-                                }
-                            });
-                        }
-                    });
-
-                } else if (replaceableEvent) {
-                    var thisPubkey = newEvent.pubkey;
-
-                    eventCollection.findOne({ pubkey: thisPubkey, kind: thisKind }, { _id: 0 }, (err, result) => {
-                        // If something is found, compare time stamps. newer one gets written
-
-                        if (result) {
-                            if (result.created_at >= newEvent.created_at) {
-                                callback ? callback(undefined, result) : void(0);
-                                return resolve(result);
+                        eventCollection.findOne({ id: eventId }, { _id: 0 }, (err, result) => {
+                            // If event exists just act like we wrote it
+                            if (result) {
+                                var cleanEvent = this._cleanEvent(newEvent);
+                                // this._sendToListeners(cleanEvent);
+                                callback ? callback(undefined, cleanEvent) : void (0);
+                                return resolve(cleanEvent);
                             } else {
-                                eventCollection.remove({ id: result.id }, (err, result) => {
+                                // Write event
+
+                                eventCollection.insert(newEvent, (err) => {
                                     if (!err) {
-                                        // console.log("Removal result: ", result);
+                                        var cleanEvent = this._cleanEvent(newEvent);
+                                        this._sendToListeners(cleanEvent, source);
+                                        callback ? callback(undefined, cleanEvent) : void (0);
+                                        return resolve(cleanEvent);
+                                    } else {
+                                        console.error(err);
+                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                        return reject(new Error(INSERT_DATABASE_ERROR));
+                                    }
+                                });
+                            }
+                        });
+                    },
+                    'B' : () => {
+                        var thisPubkey = newEvent.pubkey;
+
+                        eventCollection.findOne({ pubkey: thisPubkey, kind: thisKind }, { _id: 0 }, (err, result) => {
+                            // If something is found, compare time stamps. newer one gets written
+
+                            if (result) {
+                                if (result.created_at >= newEvent.created_at) {
+                                    callback ? callback(undefined, result) : void (0);
+                                    return resolve(result);
+                                } else {
+                                    eventCollection.remove({ id: result.id }, (err, result) => {
+                                        if (!err) {
+                                            // console.log("Removal result: ", result);
+                                            eventCollection.insert(newEvent, (err) => {
+                                                if (!err) {
+                                                    // Broadcast new Event to any listeners
+                                                    var cleanEvent = this._cleanEvent(newEvent);
+                                                    this._sendToListeners(cleanEvent, source);
+                                                    callback ? callback(undefined, cleanEvent) : void (0);
+                                                    return resolve(cleanEvent);
+                                                } else {
+                                                    console.error(err);
+                                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                                    return reject(new Error(INSERT_DATABASE_ERROR));
+                                                }
+                                            })
+                                        } else {
+                                            console.error(err);
+                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                            return reject(new Error(INSERT_DATABASE_ERROR));
+                                        }
+                                    });
+                                }
+                            } else {
+                                eventCollection.insert(newEvent, (err, result) => {
+                                    if (!err) {
+                                        // Broadcast new Event to any listeners
+                                        var cleanEvent = this._cleanEvent(newEvent);
+                                        this._sendToListeners(cleanEvent, source);
+                                        callback ? callback(undefined, cleanEvent) : void (0);
+                                        return resolve(cleanEvent);
+                                    } else {
+                                        console.error(err);
+                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                        return reject(new Error(INSERT_DATABASE_ERROR));
+                                    }
+                                });
+                            }
+                        });
+                    },
+                    'C' : () => {
+                        // Don't store anything, just sent it off
+                        this._sendToListeners(newEvent, source);
+                        callback ? callback(undefined, newEvent) : void (0);
+                        return resolve(newEvent);
+                    },
+                    'D' : () => {
+                        var thisPubkey = newEvent.pubkey;
+                        var dTag = this._getTag(newEvent.tags, "d");
+
+                        if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
+                            // callback(new Error("Invalid DTag"));
+                            callback ? callback(new Error(INSERT_EVENT_ERROR)) : void (0);
+                            return reject(new Error(INSERT_EVENT_ERROR));
+                        }
+
+                        this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
+                            if (!err) {
+                                if (results != undefined && results.length > 0) {
+                                    // We are going to find some results with the pubkey and kind.
+                                    // Weed out the ones without the d tag
+                                    var FoundEvent = false;
+
+                                    for (var i = 0; i < results.length; i++) {
+                                        var thisEvent = results[i];
+                                        var thisEventDTag = this._getTag(thisEvent.tags, "d");
+
+                                        if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])) {
+                                            // Found!
+                                            FoundEvent = true;
+                                            if (thisEvent.created_at <= newEvent.created_at) {
+                                                eventCollection.remove({ id: thisEvent.id }, (err) => {
+                                                    if (!err) {
+                                                        eventCollection.insert(newEvent, (err) => {
+                                                            if (!err) {
+                                                                // Broadcast new Event to any listeners
+                                                                var cleanEvent = this._cleanEvent(newEvent);
+                                                                this._sendToListeners(cleanEvent, source);
+                                                                callback ? callback(undefined, cleanEvent) : void (0);
+                                                                return resolve(cleanEvent);
+                                                            } else {
+                                                                console.error(err);
+                                                                callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                                                return reject(new Error(INSERT_DATABASE_ERROR));
+                                                            }
+                                                        });
+                                                    } else {
+                                                        console.error(err);
+                                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                                        return reject(new Error(INSERT_DATABASE_ERROR));
+                                                    }
+                                                });
+                                                break;
+                                            } else {
+                                                callback ? callback(undefined, thisEvent) : void (0);
+                                                return resolve(thisEvent);
+                                            }
+                                        }
+                                    }
+                                    if (!FoundEvent) {
                                         eventCollection.insert(newEvent, (err) => {
                                             if (!err) {
                                                 // Broadcast new Event to any listeners
                                                 var cleanEvent = this._cleanEvent(newEvent);
                                                 this._sendToListeners(cleanEvent, source);
-                                                callback ? callback(undefined, cleanEvent) : void(0);
+                                                callback ? callback(undefined, cleanEvent) : void (0);
                                                 return resolve(cleanEvent);
                                             } else {
                                                 console.error(err);
-                                                callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                                callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
                                                 return reject(new Error(INSERT_DATABASE_ERROR));
                                             }
-                                        })
-                                    } else {
-                                        console.error(err);
-                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                        return reject(new Error(INSERT_DATABASE_ERROR));
+                                        });
                                     }
-                                });
-                            }
-                        } else {
-                            eventCollection.insert(newEvent, (err, result) => {
-                                if (!err) {
-                                    // Broadcast new Event to any listeners
-                                    var cleanEvent = this._cleanEvent(newEvent);
-                                    this._sendToListeners(cleanEvent, source);
-                                    callback ? callback(undefined, cleanEvent) : void(0);
-                                    return resolve(cleanEvent);
+
                                 } else {
-                                    console.error(err);
-                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                    return reject(new Error(INSERT_DATABASE_ERROR));
-                                }
-                            });
-                        }
-                    });
-                } else if (ephemeralEvent) {
-                    // Don't store anything, just sent it off
-                    this._sendToListeners(newEvent, source);
-                    callback ? callback(undefined, newEvent) : void(0);
-                    return resolve(newEvent);
-                } else if (addressableReplaceable) {
-                    var thisPubkey = newEvent.pubkey;
-                    var dTag = this._getTag(newEvent.tags, "d");
-
-                    if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
-                        // callback(new Error("Invalid DTag"));
-                        callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
-                        return reject(new Error(INSERT_EVENT_ERROR));
-                    }
-
-                    this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
-                        if (!err) {
-                            if (results != undefined && results.length > 0) {
-                                // We are going to find some results with the pubkey and kind.
-                                // Weed out the ones without the d tag
-                                var FoundEvent = false;
-
-                                for (var i = 0; i < results.length; i++) {
-                                    var thisEvent = results[i];
-                                    var thisEventDTag = this._getTag(thisEvent.tags, "d");
-
-                                    if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])) {
-                                        // Found!
-                                        FoundEvent = true;
-                                        if (thisEvent.created_at <= newEvent.created_at) {
-                                            eventCollection.remove({ id: thisEvent.id }, (err) => {
-                                                if (!err) {
-                                                    eventCollection.insert(newEvent, (err) => {
-                                                        if (!err) {
-                                                            // Broadcast new Event to any listeners
-                                                            var cleanEvent = this._cleanEvent(newEvent);
-                                                            this._sendToListeners(cleanEvent, source);
-                                                            callback ? callback(undefined, cleanEvent) : void(0);
-                                                            return resolve(cleanEvent);
-                                                        } else {
-                                                            console.error(err);
-                                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                                            return reject(new Error(INSERT_DATABASE_ERROR));
-                                                        }
-                                                    });
-                                                } else {
-                                                    console.error(err);
-                                                    callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                                    return reject(new Error(INSERT_DATABASE_ERROR));
-                                                }
-                                            });
-                                            break;
-                                        } else {
-                                            callback ? callback(undefined, thisEvent) : void(0);
-                                            return resolve(thisEvent);
-                                        }
-                                    }
-                                }
-                                if (!FoundEvent){
                                     eventCollection.insert(newEvent, (err) => {
                                         if (!err) {
                                             // Broadcast new Event to any listeners
                                             var cleanEvent = this._cleanEvent(newEvent);
                                             this._sendToListeners(cleanEvent, source);
-                                            callback ? callback(undefined, cleanEvent) : void(0);
+                                            callback ? callback(undefined, cleanEvent) : void (0);
                                             return resolve(cleanEvent);
                                         } else {
                                             console.error(err);
-                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
                                             return reject(new Error(INSERT_DATABASE_ERROR));
                                         }
                                     });
                                 }
-
                             } else {
-                                eventCollection.insert(newEvent, (err) => {
-                                    if (!err) {
-                                        // Broadcast new Event to any listeners
-                                        var cleanEvent = this._cleanEvent(newEvent);
-                                        this._sendToListeners(cleanEvent, source);
-                                        callback ? callback(undefined, cleanEvent) : void(0);
-                                        return resolve(cleanEvent);
-                                    } else {
-                                        console.error(err);
-                                        callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                                        return reject(new Error(INSERT_DATABASE_ERROR));
-                                    }
-                                });
+                                console.error(err);
+                                callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void (0);
+                                return reject(new Error(INSERT_DATABASE_ERROR));
                             }
-                        } else {
-                            console.error(err);
-                            callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                            return reject(new Error(INSERT_DATABASE_ERROR));
-                        }
-                    });
-                } else {
-                    callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
-                    return reject(new Error(INSERT_EVENT_ERROR));
-                }
+                        });
+                    },
+                    'ERROR' : () => {
+                        callback ? callback(new Error(INSERT_EVENT_ERROR)) : void (0);
+                        return reject(new Error(INSERT_EVENT_ERROR));
+                    }
+                }[eventClass]();
+
+                // if (regularEvent || undefinedNIP01Event) {
+                //     var eventId = newEvent.id;
+
+                //     eventCollection.findOne({ id: eventId }, { _id: 0 }, (err, result) => {
+                //         // If event exists just act like we wrote it
+                //         if (result) {
+                //             var cleanEvent = this._cleanEvent(newEvent);
+                //             // this._sendToListeners(cleanEvent);
+                //             callback ? callback(undefined, cleanEvent) : void(0);
+                //             return resolve(cleanEvent);
+                //         } else {
+                //             // Write event
+
+                //             eventCollection.insert(newEvent, (err) => {
+                //                 if (!err) {
+                //                     var cleanEvent = this._cleanEvent(newEvent);
+                //                     this._sendToListeners(cleanEvent, source);
+                //                     callback ? callback(undefined, cleanEvent) : void(0);
+                //                     return resolve(cleanEvent);
+                //                 } else {
+                //                     console.error(err);
+                //                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                     return reject(new Error(INSERT_DATABASE_ERROR));
+                //                 }
+                //             });
+                //         }
+                //     });
+
+                // } else if (replaceableEvent) {
+                //     var thisPubkey = newEvent.pubkey;
+
+                //     eventCollection.findOne({ pubkey: thisPubkey, kind: thisKind }, { _id: 0 }, (err, result) => {
+                //         // If something is found, compare time stamps. newer one gets written
+
+                //         if (result) {
+                //             if (result.created_at >= newEvent.created_at) {
+                //                 callback ? callback(undefined, result) : void(0);
+                //                 return resolve(result);
+                //             } else {
+                //                 eventCollection.remove({ id: result.id }, (err, result) => {
+                //                     if (!err) {
+                //                         // console.log("Removal result: ", result);
+                //                         eventCollection.insert(newEvent, (err) => {
+                //                             if (!err) {
+                //                                 // Broadcast new Event to any listeners
+                //                                 var cleanEvent = this._cleanEvent(newEvent);
+                //                                 this._sendToListeners(cleanEvent, source);
+                //                                 callback ? callback(undefined, cleanEvent) : void(0);
+                //                                 return resolve(cleanEvent);
+                //                             } else {
+                //                                 console.error(err);
+                //                                 callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                                 return reject(new Error(INSERT_DATABASE_ERROR));
+                //                             }
+                //                         })
+                //                     } else {
+                //                         console.error(err);
+                //                         callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                         return reject(new Error(INSERT_DATABASE_ERROR));
+                //                     }
+                //                 });
+                //             }
+                //         } else {
+                //             eventCollection.insert(newEvent, (err, result) => {
+                //                 if (!err) {
+                //                     // Broadcast new Event to any listeners
+                //                     var cleanEvent = this._cleanEvent(newEvent);
+                //                     this._sendToListeners(cleanEvent, source);
+                //                     callback ? callback(undefined, cleanEvent) : void(0);
+                //                     return resolve(cleanEvent);
+                //                 } else {
+                //                     console.error(err);
+                //                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                     return reject(new Error(INSERT_DATABASE_ERROR));
+                //                 }
+                //             });
+                //         }
+                //     });
+                // } else if (ephemeralEvent) {
+                //     // Don't store anything, just sent it off
+                //     this._sendToListeners(newEvent, source);
+                //     callback ? callback(undefined, newEvent) : void(0);
+                //     return resolve(newEvent);
+                // } else if (addressableReplaceable) {
+                //     var thisPubkey = newEvent.pubkey;
+                //     var dTag = this._getTag(newEvent.tags, "d");
+
+                //     if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
+                //         // callback(new Error("Invalid DTag"));
+                //         callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
+                //         return reject(new Error(INSERT_EVENT_ERROR));
+                //     }
+
+                //     this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
+                //         if (!err) {
+                //             if (results != undefined && results.length > 0) {
+                //                 // We are going to find some results with the pubkey and kind.
+                //                 // Weed out the ones without the d tag
+                //                 var FoundEvent = false;
+
+                //                 for (var i = 0; i < results.length; i++) {
+                //                     var thisEvent = results[i];
+                //                     var thisEventDTag = this._getTag(thisEvent.tags, "d");
+
+                //                     if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])) {
+                //                         // Found!
+                //                         FoundEvent = true;
+                //                         if (thisEvent.created_at <= newEvent.created_at) {
+                //                             eventCollection.remove({ id: thisEvent.id }, (err) => {
+                //                                 if (!err) {
+                //                                     eventCollection.insert(newEvent, (err) => {
+                //                                         if (!err) {
+                //                                             // Broadcast new Event to any listeners
+                //                                             var cleanEvent = this._cleanEvent(newEvent);
+                //                                             this._sendToListeners(cleanEvent, source);
+                //                                             callback ? callback(undefined, cleanEvent) : void(0);
+                //                                             return resolve(cleanEvent);
+                //                                         } else {
+                //                                             console.error(err);
+                //                                             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                                             return reject(new Error(INSERT_DATABASE_ERROR));
+                //                                         }
+                //                                     });
+                //                                 } else {
+                //                                     console.error(err);
+                //                                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                                     return reject(new Error(INSERT_DATABASE_ERROR));
+                //                                 }
+                //                             });
+                //                             break;
+                //                         } else {
+                //                             callback ? callback(undefined, thisEvent) : void(0);
+                //                             return resolve(thisEvent);
+                //                         }
+                //                     }
+                //                 }
+                //                 if (!FoundEvent){
+                //                     eventCollection.insert(newEvent, (err) => {
+                //                         if (!err) {
+                //                             // Broadcast new Event to any listeners
+                //                             var cleanEvent = this._cleanEvent(newEvent);
+                //                             this._sendToListeners(cleanEvent, source);
+                //                             callback ? callback(undefined, cleanEvent) : void(0);
+                //                             return resolve(cleanEvent);
+                //                         } else {
+                //                             console.error(err);
+                //                             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                             return reject(new Error(INSERT_DATABASE_ERROR));
+                //                         }
+                //                     });
+                //                 }
+
+                //             } else {
+                //                 eventCollection.insert(newEvent, (err) => {
+                //                     if (!err) {
+                //                         // Broadcast new Event to any listeners
+                //                         var cleanEvent = this._cleanEvent(newEvent);
+                //                         this._sendToListeners(cleanEvent, source);
+                //                         callback ? callback(undefined, cleanEvent) : void(0);
+                //                         return resolve(cleanEvent);
+                //                     } else {
+                //                         console.error(err);
+                //                         callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //                         return reject(new Error(INSERT_DATABASE_ERROR));
+                //                     }
+                //                 });
+                //             }
+                //         } else {
+                //             console.error(err);
+                //             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
+                //             return reject(new Error(INSERT_DATABASE_ERROR));
+                //         }
+                //     });
+                // } else {
+                //     callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
+                //     return reject(new Error(INSERT_EVENT_ERROR));
+                // }
 
                 /*
                 for kind n such that 1000 <= n < 10000 || 4 <= n < 45 || n == 1 || n == 2, events are regular, which means they're all expected to be stored by relays.
