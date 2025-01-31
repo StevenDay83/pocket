@@ -330,7 +330,7 @@ class Relay {
                     },
                     'ERROR' : () => {
                         callback ? callback(new Error(INSERT_EVENT_ERROR)) : void (0);
-                        return reject(new Error(INSERT_EVENT_ERROR));
+                        return resolve(undefined);
                     }
                 }[eventClass]();
 
