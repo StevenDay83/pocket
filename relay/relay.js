@@ -244,7 +244,7 @@ class Relay {
                         if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
                             // callback(new Error("Invalid DTag"));
                             callback ? callback(new Error(INSERT_EVENT_ERROR)) : void (0);
-                            return reject(new Error(INSERT_EVENT_ERROR));
+                            return resolve(undefined);
                         }
 
                         this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
