@@ -30,7 +30,7 @@ class HypercoreConnect {
             this.LocalHyperCoreSwarm = new Hyperswarm();
 
             this.LocalHyperCoreSwarm.on('connection', (localConn) => {
-                this.LocalHyperCore.replicate(localConn);
+                this.LocalHyperCore.replicate(false, localConn);
                 _isStandAlone() ? 
                 console.log("Local HyperCore (" + b4a.toString(this.LocalHyperCore.key,'hex') +"): Received connection from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")") :
                 void(0);
@@ -62,30 +62,41 @@ class HypercoreConnect {
             this.ReadableHyperCoreSwarms[b4a.toString(thisCore.key, 'hex')] = thisSwarm;
             var currentCoreLength = thisCore.length;
 
-            thisCore.on('append', () => {
+            thisCore.on('append', async () => {
                 // var currentCoreLength = thisCore.length;
 
                 if (thisCore.length > currentCoreLength){
-                    var count = currentCoreLength;
+                    // var count = currentCoreLength;
 
                     for (var i = currentCoreLength; i < thisCore.length; i++){
-                        thisCore.get(i).then((data) => {
-                            this._sendToListeners(b4a.toString(thisCore.key, 'hex'), data);
+                        // thisCore.get(i).then((data) => {
+                        //     this._sendToListeners(b4a.toString(thisCore.key, 'hex'), data);
 
-                            count++;
+                        //     count++;
 
-                            if (count == thisCore.length){
-                                currentCoreLength = thisCore.length;
-                            }
-                        });
+                        //     if (count == thisCore.length){
+                        //         currentCoreLength = thisCore.length;
+                        //     }
+                        // });
+
+                        var thisData = await thisCore.get(i);
+
+                        this._sendToListeners(b4a.toString(thisCore.key, 'hex'), thisData);
+                        currentCoreLength = thisCore.length;
                     }
                 }
             });
 
             thisSwarm.on('connection', async (conn) => {
-                thisCore.replicate(conn);
+                thisCore.replicate(true, conn);
                 await thisCore.update();
-                await thisCore.download({linear: true});
+
+                var hcBlockStart = 0;
+
+                if (thisCore.length > 500){
+                    hcBlockStart = thisCore.length - 500;
+                }
+                await thisCore.download({start: hcBlockStart, linear: true});
 
                 _isStandAlone() ? console.log("Remote Hypercore ("+ b4a.toString(thisCore.key,'hex') +"): Received connection from peer (" + b4a.toString(conn.remotePublicKey, 'hex') + ")") :
                 void(0);

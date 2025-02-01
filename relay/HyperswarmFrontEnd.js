@@ -23,6 +23,7 @@ class HyperswarmFrontEnd {
         this.LocalHyperCore = {};
         this.HyperCoreSwarmConnect = new HyperCoreConnect();
         this.gossipKeyInterval;
+        this.keyCheckCache = [];
     }
 
     initializeCores(callback){
@@ -402,6 +403,22 @@ class HyperswarmFrontEnd {
         return isFound;
     }
 
+    _isInKeyCheckCache(keyString){
+        return this.keyCheckCache.indexOf(keyString) != -1;
+    }
+
+    _addToKeyCheckCache(keyString){
+        if (!this._isInKeyCheckCache(keyString)){
+            this.keyCheckCache.push(keyString);
+        }
+    }
+
+    _removeFromKeyCacheCache(keyString){
+        if (!this._isInKeyCheckCache(keyString)){
+            this.keyCheckCache.splice(this.keyCheckCache.indexOf(keyString), 1);
+        }
+    }
+
     _handleData(connection, data, callback){
         try {
             if (connection && data){
@@ -415,7 +432,8 @@ class HyperswarmFrontEnd {
 
                     if (directive == KEY_RESPONSE_PREFIX){
                         if (payload.length == 64) {
-                            if (!this.hyperCoreExists(b4a.from(payload, 'hex'))){
+                            if (!this.hyperCoreExists(b4a.from(payload, 'hex')) && !this._isInKeyCheckCache(payload)){
+                                this._addToKeyCheckCache(payload);
                                 _isVerbose() ? console.log("Hypercore ", payload, "does not exists") : void(0);
 
                                 var currentCoreDirectory = this.BaseHyperCoreDirectory + '/' + b4a.toString(this.SwarmTopicKey, 'hex') + '/';
@@ -427,6 +445,7 @@ class HyperswarmFrontEnd {
 
                                 newHyperCore.ready().then(() => {
                                     this.ReadableHyperCoreList.push(newHyperCore);
+                                    this._removeFromKeyCacheCache(payload);
                                     this.HyperCoreSwarmConnect.addReadableHyperCoreSwarm(newHyperCore, new Hyperswarm(), (err) => {
                                         callback(err);
                                     });
