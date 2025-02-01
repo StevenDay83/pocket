@@ -30,7 +30,7 @@ class HypercoreConnect {
             this.LocalHyperCoreSwarm = new Hyperswarm();
 
             this.LocalHyperCoreSwarm.on('connection', (localConn) => {
-                this.LocalHyperCore.replicate(false, localConn);
+                this.LocalHyperCore.replicate(localConn);
                 _isStandAlone() ? 
                 console.log("Local HyperCore (" + b4a.toString(this.LocalHyperCore.key,'hex') +"): Received connection from peer (" + b4a.toString(localConn.remotePublicKey, 'hex') + ")") :
                 void(0);
@@ -88,7 +88,7 @@ class HypercoreConnect {
             });
 
             thisSwarm.on('connection', async (conn) => {
-                thisCore.replicate(true, conn);
+                thisCore.replicate(conn);
                 await thisCore.update();
 
                 var hcBlockStart = 0;
