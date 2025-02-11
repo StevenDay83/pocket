@@ -99,7 +99,7 @@ class WebSocketRelayFrontEnd {
                                         }
 
                                         socket.send(JSON.stringify(eventResponse));
-                                        _isVerbose(1) ? console.log(JSON.stringify(eventResponse)) : void(0);
+                                        // _isVerbose(1) ? console.log(JSON.stringify(eventResponse)) : void(0);
                                     });
                                 } else {
                                     throw new Error("Invalid Event");

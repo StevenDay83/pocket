@@ -1,4 +1,3 @@
-const ws = require('ws');
 const Engine = require('tingodb')();
 const NostrTools = require("nostr-tools");
 const fs = require('fs');
@@ -59,75 +58,6 @@ class Relay {
             });
         } else {
             callback(undefined);
-        }
-    }
-
-    _handleMessage(socket, newMessage){
-        try {
-            // console.log(newMessage.toString());
-            var newNostrMessage = JSON.parse(newMessage);
-
-            if (Array.isArray(newNostrMessage) && newNostrMessage.length >= 2){
-                var nostrMessagePrefix = newNostrMessage[0];
-
-                if (nostrMessagePrefix == 'EVENT' || nostrMessagePrefix == 'REQ' || nostrMessagePrefix == 'CLOSE'){
-                    switch(nostrMessagePrefix){
-                        case 'EVENT': {
-                            var newEvent = newNostrMessage[1];
-                            var eventResponse = ['EVENT'];
-
-                            if (NostrTools.verifyEvent(newEvent)){
-                                this.insertEvent(newEvent, (err,returnedEvent) => {
-                                    if (!err){
-                                        if (returnedEvent && returnedEvent.id == newEvent.id){
-                                            eventResponse.push(newEvent.id);
-                                            eventResponse.push(true);
-                                            eventResponse.push("");
-
-                                        } else {
-                                            eventResponse.push(newEvent.id);
-                                            eventResponse.push(false);
-                                            eventResponse.push("");
-                                        }
-
-                                        // socket.send("Hello");
-                                        socket.send(JSON.stringify(eventResponse));
-                                        console.log(JSON.stringify(eventResponse));
-                                    } else {
-                                        throw err;
-                                    }
-                                });
-                            } else {
-                                throw new Error("Invalid Event");
-                            }
-
-                            break;
-                        }
-
-                        case 'REQ': {
-
-                            break;
-                        }
-
-                        case 'CLOSE': {
-
-                        }
-                    }
-                } else {
-                    // Invalid Prefix
-                }
-            }
-
-        } catch (e) {
-            // JSON Parse error
-            if (e.message == "something"){
-
-            } else {
-                // Invalid command
-            }
-
-            console.log(e);
-
         }
     }
 
@@ -334,184 +264,6 @@ class Relay {
                     }
                 }[eventClass]();
 
-                // if (regularEvent || undefinedNIP01Event) {
-                //     var eventId = newEvent.id;
-
-                //     eventCollection.findOne({ id: eventId }, { _id: 0 }, (err, result) => {
-                //         // If event exists just act like we wrote it
-                //         if (result) {
-                //             var cleanEvent = this._cleanEvent(newEvent);
-                //             // this._sendToListeners(cleanEvent);
-                //             callback ? callback(undefined, cleanEvent) : void(0);
-                //             return resolve(cleanEvent);
-                //         } else {
-                //             // Write event
-
-                //             eventCollection.insert(newEvent, (err) => {
-                //                 if (!err) {
-                //                     var cleanEvent = this._cleanEvent(newEvent);
-                //                     this._sendToListeners(cleanEvent, source);
-                //                     callback ? callback(undefined, cleanEvent) : void(0);
-                //                     return resolve(cleanEvent);
-                //                 } else {
-                //                     console.error(err);
-                //                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                     return reject(new Error(INSERT_DATABASE_ERROR));
-                //                 }
-                //             });
-                //         }
-                //     });
-
-                // } else if (replaceableEvent) {
-                //     var thisPubkey = newEvent.pubkey;
-
-                //     eventCollection.findOne({ pubkey: thisPubkey, kind: thisKind }, { _id: 0 }, (err, result) => {
-                //         // If something is found, compare time stamps. newer one gets written
-
-                //         if (result) {
-                //             if (result.created_at >= newEvent.created_at) {
-                //                 callback ? callback(undefined, result) : void(0);
-                //                 return resolve(result);
-                //             } else {
-                //                 eventCollection.remove({ id: result.id }, (err, result) => {
-                //                     if (!err) {
-                //                         // console.log("Removal result: ", result);
-                //                         eventCollection.insert(newEvent, (err) => {
-                //                             if (!err) {
-                //                                 // Broadcast new Event to any listeners
-                //                                 var cleanEvent = this._cleanEvent(newEvent);
-                //                                 this._sendToListeners(cleanEvent, source);
-                //                                 callback ? callback(undefined, cleanEvent) : void(0);
-                //                                 return resolve(cleanEvent);
-                //                             } else {
-                //                                 console.error(err);
-                //                                 callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                                 return reject(new Error(INSERT_DATABASE_ERROR));
-                //                             }
-                //                         })
-                //                     } else {
-                //                         console.error(err);
-                //                         callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                         return reject(new Error(INSERT_DATABASE_ERROR));
-                //                     }
-                //                 });
-                //             }
-                //         } else {
-                //             eventCollection.insert(newEvent, (err, result) => {
-                //                 if (!err) {
-                //                     // Broadcast new Event to any listeners
-                //                     var cleanEvent = this._cleanEvent(newEvent);
-                //                     this._sendToListeners(cleanEvent, source);
-                //                     callback ? callback(undefined, cleanEvent) : void(0);
-                //                     return resolve(cleanEvent);
-                //                 } else {
-                //                     console.error(err);
-                //                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                     return reject(new Error(INSERT_DATABASE_ERROR));
-                //                 }
-                //             });
-                //         }
-                //     });
-                // } else if (ephemeralEvent) {
-                //     // Don't store anything, just sent it off
-                //     this._sendToListeners(newEvent, source);
-                //     callback ? callback(undefined, newEvent) : void(0);
-                //     return resolve(newEvent);
-                // } else if (addressableReplaceable) {
-                //     var thisPubkey = newEvent.pubkey;
-                //     var dTag = this._getTag(newEvent.tags, "d");
-
-                //     if (dTag == undefined || !Array.isArray(dTag) || dTag.length < 1) {
-                //         // callback(new Error("Invalid DTag"));
-                //         callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
-                //         return reject(new Error(INSERT_EVENT_ERROR));
-                //     }
-
-                //     this._findResultsOR(eventCollection, { pubkey: thisPubkey, kind: thisKind }, {}, (err, results) => {
-                //         if (!err) {
-                //             if (results != undefined && results.length > 0) {
-                //                 // We are going to find some results with the pubkey and kind.
-                //                 // Weed out the ones without the d tag
-                //                 var FoundEvent = false;
-
-                //                 for (var i = 0; i < results.length; i++) {
-                //                     var thisEvent = results[i];
-                //                     var thisEventDTag = this._getTag(thisEvent.tags, "d");
-
-                //                     if (thisEventDTag != undefined && thisEventDTag.length > 1 && (thisEventDTag[1] == dTag[1])) {
-                //                         // Found!
-                //                         FoundEvent = true;
-                //                         if (thisEvent.created_at <= newEvent.created_at) {
-                //                             eventCollection.remove({ id: thisEvent.id }, (err) => {
-                //                                 if (!err) {
-                //                                     eventCollection.insert(newEvent, (err) => {
-                //                                         if (!err) {
-                //                                             // Broadcast new Event to any listeners
-                //                                             var cleanEvent = this._cleanEvent(newEvent);
-                //                                             this._sendToListeners(cleanEvent, source);
-                //                                             callback ? callback(undefined, cleanEvent) : void(0);
-                //                                             return resolve(cleanEvent);
-                //                                         } else {
-                //                                             console.error(err);
-                //                                             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                                             return reject(new Error(INSERT_DATABASE_ERROR));
-                //                                         }
-                //                                     });
-                //                                 } else {
-                //                                     console.error(err);
-                //                                     callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                                     return reject(new Error(INSERT_DATABASE_ERROR));
-                //                                 }
-                //                             });
-                //                             break;
-                //                         } else {
-                //                             callback ? callback(undefined, thisEvent) : void(0);
-                //                             return resolve(thisEvent);
-                //                         }
-                //                     }
-                //                 }
-                //                 if (!FoundEvent){
-                //                     eventCollection.insert(newEvent, (err) => {
-                //                         if (!err) {
-                //                             // Broadcast new Event to any listeners
-                //                             var cleanEvent = this._cleanEvent(newEvent);
-                //                             this._sendToListeners(cleanEvent, source);
-                //                             callback ? callback(undefined, cleanEvent) : void(0);
-                //                             return resolve(cleanEvent);
-                //                         } else {
-                //                             console.error(err);
-                //                             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                             return reject(new Error(INSERT_DATABASE_ERROR));
-                //                         }
-                //                     });
-                //                 }
-
-                //             } else {
-                //                 eventCollection.insert(newEvent, (err) => {
-                //                     if (!err) {
-                //                         // Broadcast new Event to any listeners
-                //                         var cleanEvent = this._cleanEvent(newEvent);
-                //                         this._sendToListeners(cleanEvent, source);
-                //                         callback ? callback(undefined, cleanEvent) : void(0);
-                //                         return resolve(cleanEvent);
-                //                     } else {
-                //                         console.error(err);
-                //                         callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //                         return reject(new Error(INSERT_DATABASE_ERROR));
-                //                     }
-                //                 });
-                //             }
-                //         } else {
-                //             console.error(err);
-                //             callback ? callback(new Error(INSERT_DATABASE_ERROR)) : void(0);
-                //             return reject(new Error(INSERT_DATABASE_ERROR));
-                //         }
-                //     });
-                // } else {
-                //     callback ? callback(new Error(INSERT_EVENT_ERROR)) : void(0);
-                //     return reject(new Error(INSERT_EVENT_ERROR));
-                // }
-
                 /*
                 for kind n such that 1000 <= n < 10000 || 4 <= n < 45 || n == 1 || n == 2, events are regular, which means they're all expected to be stored by relays.
     for kind n such that 10000 <= n < 20000 || n == 0 || n == 3, events are replaceable, which means that, for each combination of pubkey and kind, only the latest event MUST be stored by relays, older versions MAY be discarded.
@@ -529,30 +281,6 @@ class Relay {
 
     _sendToListeners(newEvent, source){
         var contextList = Object.keys(this.querySubs);
-
-        /*
-        {
-            "SELF":{
-                '123': [
-                    [query1, listener1],
-                    [query2, listener2]
-                ],
-                '456': [
-                    [query3, listener3]
-                ]
-            },
-            SOCKET:{
-                '123': [
-                    [query4, listener4],
-                    [query5, listener5]
-                ],
-                '456': [
-                    [query6, listener6]
-                ]
-            }
-        }
-        
-        */
 
         if (contextList && contextList.length > 0){
             for (var i = 0; i < contextList.length; i++){
@@ -589,41 +317,6 @@ class Relay {
                 }
             }
         }
-
-
-        // if (contextList && contextList.length > 0){
-        //     for (var i = 0; i < contextList.length; i++){
-        //         var thisContext = this.querySubs[contextList[i]];
-        //         // var subList = Object.keys(this.querySubs[thisContext]);
-
-        //         for (var j = 0; j < thisContext.length; j++){
-        //             var subscription = thisContext[i];
-        
-        //             if (subscription && Array.isArray(subscription) && subscription.length == 2){
-        //                 var query = subscription[0];
-        //                 var listener = subscription[1];
-        
-        //                 if (this._matchEvent(newEvent, query)){
-        //                     listener(contextList[i], subList[j], newEvent);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-        // var subList = Object.keys(this.querySubs);
-
-        // for (var j = 0; j < subList.length; j++){
-        //     var subscription = this.querySubs[subList[i]];
-
-        //     if (subscription && Array.isArray(subscription) && subscription.length == 2){
-        //         var query = subscription[0];
-        //         var listener = subscription[1];
-
-        //         if (this._matchEvent(newEvent, query)){
-        //             listener(subList[j], newEvent);
-        //         }
-        //     }
-        // }
     }
 
     clearAllQueries(){
@@ -1017,56 +710,8 @@ class Relay {
             }
         }
 
-        // var isMatch;
-                        
-        // for (var i = 0; i < results.length; i++){
-        //     isMatch = true;
-        //     var thisEvent = results[i];
-
-        //     if (Object.keys(tags).length > 0) {
-        //         var thisEventTags = thisEvent.tags;
-
-        //         if (thisEventTags.length > 0) {
-        //             var queryTagsList = Object.keys(tags);
-        //             for (var j = 0; j < queryTagsList.length; j++){
-        //                 // console.log("First: ", this._getTag(thisEventTags, queryTagsList[j].replace('#','')));
-        //                 // console.log("Second: ", tags[queryTagsList[j]]);
-
-        //                 var tagArray = this._getTag(thisEventTags, queryTagsList[j].replace('#',''));
-
-        //                 if (!(tagArray && tagArray[1] == tags[queryTagsList[j]])){
-        //                     isMatch = false;
-        //                     break;
-        //                 }
-        //             }
-        //         } else {
-        //             continue;
-        //         }
-        //     }
-
-        //     if (isMatch){
-        //         finalSearchResults.push(thisEvent);
-        //     }
-        // }
-
         return isMatch;
     }
-
-    // _findResults(collection, criteria, options, callback){
-    //     collection.find(criteria, {_id:0}, options, (err, results) => {
-    //         if (!err){
-    //             results.toArray((err, rArray) => {
-    //                 if (!err){
-    //                     callback(undefined, rArray);
-    //                 } else {
-    //                     callback(err);
-    //                 }
-    //             });
-    //         } else {
-    //             callback(err);
-    //         }
-    //     });
-    // }
 
     _findResultsOR(collection, criteria, options, callback){
         var criteriaArray = Array.isArray(criteria) ? criteria : [criteria];
