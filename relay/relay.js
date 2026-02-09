@@ -569,7 +569,7 @@ class Relay {
                             for (var j = 1; j < thisTag.length; j++){
                                 var tagValue = thisTag[j];
     
-                                if (tagValue == value){
+                                if (value.indexOf(tagValue) > -1){
                                     isMatch = true;
                                     break;
                                 }
